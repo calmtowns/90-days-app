@@ -2,123 +2,100 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { useAppStore } from "@/store/useAppStore";
-import { Card } from "@/components/ui/Card";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isToday, isBefore, parseISO, addMonths, subMonths } from "date-fns";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, isBefore } from "date-fns";
 
 export default function CalendarPage() {
-  const [currentMonth, setCurrentMonth] = useState(new Date());
-  const { dayHistory, tasks, user } = useAppStore();
+  const { trackers, logs, user } = useAppStore();
+  const [month, setMonth] = useState(new Date());
+  const challengeStart = new Date(user.challengeStartDate);
 
-  const monthStart = startOfMonth(currentMonth);
-  const monthEnd = endOfMonth(currentMonth);
-  const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
-  const startPadding = monthStart.getDay();
+  const days = eachDayOfInterval({ start: startOfMonth(month), end: endOfMonth(month) });
+  const startDow = startOfMonth(month).getDay();
 
-  const getDayStatus = (date: Date) => {
-    const dateStr = format(date, "yyyy-MM-dd");
-    const history = dayHistory.find((d) => d.date === dateStr);
-    const dayTasks = tasks.filter((t) => t.date === dateStr);
-    if (history?.completed) return "completed";
-    if (dayTasks.some((t) => t.completed)) return "partial";
-    if (user && isBefore(date, parseISO(user.challengeStartDate))) return "before";
-    return "empty";
+  function getDayStatus(date: Date): 'complete' | 'partial' | 'missed' | 'future' | 'none' {
+    const dateStr = date.toISOString().split('T')[0];
+    if (!isSameMonth(date, month)) return 'none';
+    if (isBefore(date, challengeStart)) return 'none';
+    const todayDate = new Date();
+    todayDate.setHours(0, 0, 0, 0);
+    const compareDate = new Date(date);
+    compareDate.setHours(0, 0, 0, 0);
+    if (compareDate > todayDate) return 'future';
+    const dayTrackers = trackers.filter(t => t.isActive && t.categoryId !== 'askesis');
+    if (dayTrackers.length === 0) return 'none';
+    const done = dayTrackers.filter(t => logs.some(l => l.trackerId === t.id && l.date === dateStr && l.completed)).length;
+    if (done === 0) return 'missed';
+    if (done === dayTrackers.length) return 'complete';
+    return 'partial';
+  }
+
+  const statusColors: Record<string, string> = {
+    complete: '#10B981',
+    partial: '#F59E0B',
+    missed: '#EF444440',
+    future: 'rgba(255,255,255,0.05)',
+    none: 'transparent',
   };
 
-  const monthStr = format(currentMonth, "yyyy-MM");
-  const monthHistory = dayHistory.filter((d) => d.date.startsWith(monthStr));
-  const completedDays = monthHistory.filter((d) => d.completed).length;
-  const totalXP = monthHistory.reduce((sum, d) => sum + d.xpEarned, 0);
+  const statusGlow: Record<string, string> = {
+    complete: '0 0 12px rgba(16,185,129,0.4)',
+    partial: '0 0 12px rgba(245,158,11,0.3)',
+    missed: 'none', future: 'none', none: 'none',
+  };
 
   return (
-    <div className="min-h-screen bg-beige-50 dark:bg-dark-200">
-      <div className="max-w-md mx-auto px-4">
-        <div className="pt-14 pb-4">
-          <h1 className="text-2xl font-bold text-brown-700 dark:text-beige-100">Calendar</h1>
-          <p className="text-sm text-brown-400 dark:text-beige-400">Track your challenge progress</p>
-        </div>
+    <div className="ambient-bg min-h-dvh pb-28">
+      <div className="px-5 pt-14">
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
+          <h1 className="text-2xl font-semibold text-white/90">Calendar</h1>
+          <p className="text-sm text-white/30 mt-1">Your 90-day journey</p>
+        </motion.div>
 
-        <Card className="p-4 mb-4">
-          <div className="flex items-center justify-between mb-4">
-            <button
-              onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-              className="w-9 h-9 rounded-xl bg-beige-100 dark:bg-dark-50 flex items-center justify-center active:scale-90 transition-transform"
-            >
-              <ChevronLeft size={16} className="text-brown-500 dark:text-beige-300" />
-            </button>
-            <h2 className="text-base font-semibold text-brown-700 dark:text-beige-100">
-              {format(currentMonth, "MMMM yyyy")}
-            </h2>
-            <button
-              onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-              className="w-9 h-9 rounded-xl bg-beige-100 dark:bg-dark-50 flex items-center justify-center active:scale-90 transition-transform"
-            >
-              <ChevronRight size={16} className="text-brown-500 dark:text-beige-300" />
-            </button>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-card rounded-3xl p-5">
+          {/* Month nav */}
+          <div className="flex items-center justify-between mb-6">
+            <button onClick={() => setMonth(m => new Date(m.getFullYear(), m.getMonth() - 1))} className="w-9 h-9 rounded-xl flex items-center justify-center text-white/40 hover:text-white/70" style={{ background: 'rgba(255,255,255,0.05)' }}>←</button>
+            <h2 className="text-base font-semibold text-white/80">{format(month, 'MMMM yyyy')}</h2>
+            <button onClick={() => setMonth(m => new Date(m.getFullYear(), m.getMonth() + 1))} className="w-9 h-9 rounded-xl flex items-center justify-center text-white/40 hover:text-white/70" style={{ background: 'rgba(255,255,255,0.05)' }}>→</button>
           </div>
 
-          <div className="grid grid-cols-7 mb-2">
-            {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
-              <div key={d} className="text-center text-xs font-medium text-brown-400 dark:text-beige-500 py-1">{d}</div>
+          {/* Day of week headers */}
+          <div className="grid grid-cols-7 mb-3">
+            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+              <p key={i} className="text-center text-xs text-white/20 font-medium">{d}</p>
             ))}
           </div>
 
+          {/* Calendar grid */}
           <div className="grid grid-cols-7 gap-1">
-            {Array.from({ length: startPadding }).map((_, i) => <div key={`pad-${i}`} />)}
-            {days.map((day) => {
+            {Array(startDow).fill(null).map((_, i) => <div key={`empty-${i}`} />)}
+            {days.map((day, i) => {
               const status = getDayStatus(day);
-              const today = isToday(day);
+              const isT = isToday(day);
               return (
-                <motion.div
-                  key={day.toISOString()}
-                  whileTap={{ scale: 0.9 }}
-                  className={`relative aspect-square flex items-center justify-center rounded-xl text-sm font-medium transition-colors ${
-                    today
-                      ? "bg-brown-500 text-white shadow-warm-sm"
-                      : status === "completed"
-                      ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
-                      : status === "partial"
-                      ? "bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400"
-                      : status === "before"
-                      ? "text-brown-300/30 dark:text-beige-600/20"
-                      : "text-brown-600 dark:text-beige-300"
-                  }`}
-                >
-                  {format(day, "d")}
+                <motion.div key={i} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.01 }}
+                  className="aspect-square rounded-xl flex items-center justify-center relative"
+                  style={{
+                    background: isT ? 'rgba(139,92,246,0.2)' : statusColors[status] || 'rgba(255,255,255,0.03)',
+                    border: isT ? '1px solid rgba(139,92,246,0.4)' : 'none',
+                    boxShadow: isT ? 'none' : (statusGlow[status] || 'none'),
+                  }}>
+                  <span className={`text-xs font-medium ${isT ? 'text-violet-300' : status === 'complete' ? 'text-emerald-300' : status === 'partial' ? 'text-amber-300' : 'text-white/30'}`}>{format(day, 'd')}</span>
                 </motion.div>
               );
             })}
           </div>
-        </Card>
 
-        <div className="flex gap-4 justify-center flex-wrap mb-4">
-          {[
-            { color: "bg-brown-500", label: "Today" },
-            { color: "bg-green-200 dark:bg-green-900/40", label: "Completed" },
-            { color: "bg-yellow-100 dark:bg-yellow-900/30", label: "Partial" },
-          ].map(({ color, label }) => (
-            <div key={label} className="flex items-center gap-1.5">
-              <div className={`w-3 h-3 rounded-sm ${color}`} />
-              <span className="text-xs text-brown-400 dark:text-beige-500">{label}</span>
-            </div>
-          ))}
-        </div>
-
-        <Card className="p-4">
-          <h3 className="text-sm font-semibold text-brown-600 dark:text-beige-200 mb-3">
-            {format(currentMonth, "MMMM")} Summary
-          </h3>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <p className="text-2xl font-bold text-brown-700 dark:text-beige-100">{completedDays}</p>
-              <p className="text-xs text-brown-400 dark:text-beige-400">Days completed</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-brown-700 dark:text-beige-100">{totalXP}</p>
-              <p className="text-xs text-brown-400 dark:text-beige-400">XP earned</p>
-            </div>
+          {/* Legend */}
+          <div className="flex items-center justify-center gap-5 mt-5">
+            {[{ color: '#10B981', label: 'Complete' }, { color: '#F59E0B', label: 'Partial' }, { color: '#EF444440', label: 'Missed' }].map(l => (
+              <div key={l.label} className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full" style={{ background: l.color }} />
+                <p className="text-xs text-white/30">{l.label}</p>
+              </div>
+            ))}
           </div>
-        </Card>
+        </motion.div>
       </div>
     </div>
   );

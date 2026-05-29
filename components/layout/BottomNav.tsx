@@ -2,52 +2,34 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { Home, CheckSquare, BarChart2, Calendar, BookOpen } from "lucide-react";
 
-const NAV_ITEMS = [
-  { href: "/home", icon: Home, label: "Home" },
-  { href: "/tasks", icon: CheckSquare, label: "Tasks" },
-  { href: "/analytics", icon: BarChart2, label: "Stats" },
-  { href: "/calendar", icon: Calendar, label: "Calendar" },
-  { href: "/notes", icon: BookOpen, label: "Notes" },
+const NAV = [
+  { href: '/home', icon: '⬡', label: 'Home' },
+  { href: '/track', icon: '◎', label: 'Track' },
+  { href: '/calendar', icon: '◫', label: 'Calendar' },
+  { href: '/notes', icon: '◈', label: 'Notes' },
 ];
 
 export function BottomNav() {
-  const pathname = usePathname();
-
+  const path = usePathname();
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 safe-bottom">
-      <div className="glass dark:glass-dark border-t border-beige-200/50 dark:border-white/5">
-        <div className="flex items-center justify-around px-2 py-2">
-          {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
-            const active = pathname === href || pathname.startsWith(href + "/");
-            return (
-              <Link
-                key={href}
-                href={href}
-                className="flex flex-col items-center gap-1 px-3 py-1 rounded-2xl min-w-[56px] relative"
-              >
-                {active && (
-                  <motion.div
-                    layoutId="nav-active"
-                    className="absolute inset-0 bg-brown-500/10 dark:bg-brown-400/15 rounded-2xl"
-                    transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
-                  />
-                )}
-                <Icon
-                  size={22}
-                  className={`transition-colors ${active ? "text-brown-500 dark:text-brown-300" : "text-brown-400/50 dark:text-beige-400/40"}`}
-                  strokeWidth={active ? 2.5 : 1.8}
-                />
-                <span
-                  className={`text-[10px] font-medium transition-colors ${active ? "text-brown-500 dark:text-brown-300" : "text-brown-400/50 dark:text-beige-400/40"}`}
-                >
-                  {label}
-                </span>
-              </Link>
-            );
-          })}
-        </div>
+    <nav className="fixed bottom-0 inset-x-0 z-40 safe-bottom">
+      <div className="mx-4 mb-3 rounded-3xl px-6 py-3 flex justify-around items-center"
+        style={{ background: 'rgba(15,15,26,0.85)', backdropFilter: 'blur(30px)', border: '1px solid rgba(255,255,255,0.07)', boxShadow: '0 -1px 30px rgba(0,0,0,0.5)' }}>
+        {NAV.map(item => {
+          const active = path === item.href || path.startsWith(item.href);
+          return (
+            <Link key={item.href} href={item.href} className="flex flex-col items-center gap-1 relative px-3 py-1">
+              {active && (
+                <motion.div layoutId="nav-blob" className="absolute inset-0 rounded-2xl"
+                  style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.2)' }}
+                  transition={{ type: 'spring', bounce: 0.2, duration: 0.5 }} />
+              )}
+              <span className={`text-xl relative z-10 transition-all ${active ? 'scale-110' : 'scale-100 opacity-40'}`}>{item.icon}</span>
+              <span className={`text-[10px] font-medium relative z-10 transition-colors ${active ? 'text-violet-400' : 'text-white/30'}`}>{item.label}</span>
+            </Link>
+          );
+        })}
       </div>
     </nav>
   );

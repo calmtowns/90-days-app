@@ -1,81 +1,52 @@
-import type { Config } from "tailwindcss";
+import type { Config } from 'tailwindcss';
 
 const config: Config = {
-  darkMode: "class",
-  content: [
-    "./pages/**/*.{js,ts,jsx,tsx,mdx}",
-    "./components/**/*.{js,ts,jsx,tsx,mdx}",
-    "./app/**/*.{js,ts,jsx,tsx,mdx}",
-    "./features/**/*.{js,ts,jsx,tsx,mdx}",
-  ],
+  content: ['./app/**/*.{ts,tsx}', './components/**/*.{ts,tsx}'],
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
-        beige: {
-          50: "#FAFAF7",
-          100: "#F5F0E8",
-          200: "#EDE4D4",
-          300: "#DDD0B8",
-          400: "#C9B896",
-          500: "#B5A07A",
-        },
-        brown: {
-          300: "#C4A882",
-          400: "#A88B5E",
-          500: "#8B6F47",
-          600: "#7A5F3A",
-          700: "#5C4428",
-        },
-        dark: {
-          50: "#2E2A22",
-          100: "#242018",
-          200: "#1A1814",
-          300: "#141210",
-          400: "#0F0E0B",
-        },
+        void: { DEFAULT: '#080810', 50: '#0D0D1A', 100: '#0F0F1F', 200: '#141428', 300: '#1A1A35' },
+        surface: { DEFAULT: '#111120', 50: '#16162A', 100: '#1C1C33' },
+        violet: { 300: '#C4B5FD', 400: '#A78BFA', 500: '#8B5CF6', 600: '#7C3AED', 700: '#6D28D9' },
+        indigo: { 400: '#818CF8', 500: '#6366F1' },
+        silver: { DEFAULT: '#9CA3AF', light: '#D1D5DB' },
+        frost: { DEFAULT: 'rgba(255,255,255,0.06)', hover: 'rgba(255,255,255,0.10)', border: 'rgba(255,255,255,0.08)' },
       },
-      fontFamily: {
-        sans: ["Inter", "system-ui", "sans-serif"],
-      },
-      borderRadius: {
-        "2xl": "16px",
-        "3xl": "24px",
-        "4xl": "32px",
+      backgroundImage: {
+        'ambient': 'radial-gradient(ellipse at 20% 40%, rgba(139,92,246,0.12) 0%, transparent 60%), radial-gradient(ellipse at 80% 10%, rgba(99,102,241,0.08) 0%, transparent 50%), radial-gradient(ellipse at 60% 90%, rgba(16,185,129,0.05) 0%, transparent 40%)',
+        'card-shine': 'linear-gradient(135deg, rgba(255,255,255,0.05) 0%, transparent 50%, rgba(255,255,255,0.02) 100%)',
+        'violet-glow': 'radial-gradient(circle at center, rgba(139,92,246,0.3) 0%, transparent 70%)',
       },
       boxShadow: {
-        "warm-sm": "0 2px 8px rgba(139, 111, 71, 0.08)",
-        "warm-md": "0 4px 16px rgba(139, 111, 71, 0.12)",
-        "warm-lg": "0 8px 32px rgba(139, 111, 71, 0.16)",
-        "warm-xl": "0 16px 48px rgba(139, 111, 71, 0.20)",
-        "glass": "0 4px 24px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.6)",
+        'glass': '0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05)',
+        'glass-lg': '0 20px 60px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.07)',
+        'glow-violet': '0 0 30px rgba(139,92,246,0.25), 0 0 60px rgba(139,92,246,0.08)',
+        'glow-green': '0 0 20px rgba(16,185,129,0.3), 0 0 40px rgba(16,185,129,0.08)',
+        'glow-red': '0 0 20px rgba(239,68,68,0.3)',
       },
       animation: {
-        "float": "float 3s ease-in-out infinite",
-        "pulse-warm": "pulseWarm 2s ease-in-out infinite",
-        "bounce-gentle": "bounceGentle 1s ease-in-out infinite",
-        "shimmer": "shimmer 2s linear infinite",
+        'breathe': 'breathe 4s ease-in-out infinite',
+        'float-slow': 'floatSlow 6s ease-in-out infinite',
+        'pulse-glow': 'pulseGlow 2s ease-in-out infinite',
+        'shimmer': 'shimmer 2.5s linear infinite',
+        'gradient-shift': 'gradientShift 8s ease infinite',
+        'slide-up': 'slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
+        'fade-in': 'fadeIn 0.3s ease-out',
       },
       keyframes: {
-        float: {
-          "0%, 100%": { transform: "translateY(0px)" },
-          "50%": { transform: "translateY(-8px)" },
-        },
-        pulseWarm: {
-          "0%, 100%": { opacity: "1" },
-          "50%": { opacity: "0.7" },
-        },
-        bounceGentle: {
-          "0%, 100%": { transform: "translateY(0)" },
-          "50%": { transform: "translateY(-4px)" },
-        },
-        shimmer: {
-          "0%": { backgroundPosition: "-200% 0" },
-          "100%": { backgroundPosition: "200% 0" },
-        },
+        breathe: { '0%,100%': { transform: 'scale(1)', opacity: '0.9' }, '50%': { transform: 'scale(1.015)', opacity: '1' } },
+        floatSlow: { '0%,100%': { transform: 'translateY(0px)' }, '50%': { transform: 'translateY(-8px)' } },
+        pulseGlow: { '0%,100%': { opacity: '0.4' }, '50%': { opacity: '0.9' } },
+        shimmer: { '0%': { backgroundPosition: '-200% 0' }, '100%': { backgroundPosition: '200% 0' } },
+        gradientShift: { '0%,100%': { backgroundPosition: '0% 50%' }, '50%': { backgroundPosition: '100% 50%' } },
+        slideUp: { '0%': { transform: 'translateY(20px)', opacity: '0' }, '100%': { transform: 'translateY(0)', opacity: '1' } },
+        fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
       },
+      fontFamily: { sans: ['var(--font-inter)', 'system-ui', 'sans-serif'] },
+      backdropBlur: { xs: '4px' },
     },
   },
   plugins: [],
 };
-
 export default config;

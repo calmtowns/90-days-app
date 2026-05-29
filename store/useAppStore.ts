@@ -1,280 +1,143 @@
-import { create } from "zustand";
-import { persist, createJSONStorage } from "zustand/middleware";
-import type { AppState, Task, Note, UserProfile, Character, DayProgress } from "@/types";
-import { generateId, getXPForTask, getLevelFromXP, getXPForLevel, getTotalXPForLevel, getTodayString, isNightTime } from "@/lib/utils";
-import { differenceInCalendarDays, parseISO } from "date-fns";
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import type { AppState, CategoryId, Tracker, TrackerLog, AskesisItem, Note, WeatherData } from '@/types';
 
-interface AppActions {
-  // User
-  setUser: (user: UserProfile) => void;
-  completeOnboarding: (name: string, goalAreas: UserProfile["goalAreas"]) => void;
+const generateId = () => Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+const today = () => new Date().toISOString().split('T')[0];
 
-  // Tasks
-  addTask: (task: Omit<Task, "id" | "createdAt" | "completed" | "xpReward">) => void;
-  toggleTask: (taskId: string) => void;
-  deleteTask: (taskId: string) => void;
-  getTodayTasks: () => Task[];
+const XP_PER_TRACKER = 15;
+const XP_ASKESIS_BONUS = 25;
 
-  // Notes
-  addNote: (title: string, content: string) => void;
-  updateNote: (id: string, title: string, content: string) => void;
-  deleteNote: (id: string) => void;
-
-  // Character
-  addXP: (amount: number) => void;
-  updateCharacterState: () => void;
-
-  // Streak & Progress
-  updateDayProgress: () => void;
-  calculateStreak: () => void;
-
-  // UI
-  toggleDarkMode: () => void;
-
-  // Reset
-  resetApp: () => void;
+function getXPForLevel(level: number): number {
+  return Math.floor(100 * Math.pow(1.15, level - 1));
 }
 
-const initialCharacter: Character = {
-  name: "Hero",
-  level: 1,
-  xp: 0,
-  xpToNextLevel: 100,
-  state: "idle",
-  totalXpEarned: 0,
+export function getLevelFromXP(totalXP: number): { level: number; xpInLevel: number; xpToNext: number } {
+  let level = 1;
+  let remaining = totalXP;
+  while (remaining >= getXPForLevel(level)) {
+    remaining -= getXPForLevel(level);
+    level++;
+    if (level >= 100) break;
+  }
+  return { level, xpInLevel: remaining, xpToNext: getXPForLevel(level) };
+}
+
+const defaultTrackers: Tracker[] = [
+  { id: 'h1', categoryId: 'health', name: 'Drink 2L water', icon: '💧', createdAt: today(), isActive: true },
+  { id: 'h2', categoryId: 'health', name: 'Sleep 8 hours', icon: '🌙', createdAt: today(), isActive: true },
+  { id: 's1', categoryId: 'sport', name: 'Morning workout', icon: '💪', createdAt: today(), isActive: true },
+  { id: 'w1', categoryId: 'work', name: 'Deep work 2h', icon: '🎯', createdAt: today(), isActive: true },
+  { id: 'd1', categoryId: 'development', name: 'Read 30 min', icon: '📚', createdAt: today(), isActive: true },
+];
+
+const initialState = {
+  user: { name: '', onboardingCompleted: false, challengeStartDate: today() },
+  trackers: defaultTrackers,
+  logs: [] as TrackerLog[],
+  askesisItems: [] as AskesisItem[],
+  notes: [] as Note[],
+  dayRecords: [],
+  totalXP: 0,
+  darkMode: true,
+  weather: null,
+  weatherLastFetched: null,
 };
 
-const initialState: AppState = {
-  user: null,
-  character: initialCharacter,
-  tasks: [],
-  notes: [],
-  dayHistory: [],
-  currentStreak: 0,
-  longestStreak: 0,
-  totalDaysCompleted: 0,
-  challengeDay: 1,
-  darkMode: false,
-};
-
-export const useAppStore = create<AppState & AppActions>()(
+export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
       ...initialState,
 
-      setUser: (user) => set({ user }),
+      completeOnboarding: (name) => set(s => ({
+        user: { ...s.user, name, onboardingCompleted: true, challengeStartDate: today() }
+      })),
 
-      completeOnboarding: (name, goalAreas) => {
-        const user: UserProfile = {
-          id: generateId(),
-          name,
-          goalAreas,
-          challengeStartDate: getTodayString(),
-          createdAt: new Date().toISOString(),
-          onboardingCompleted: true,
-        };
-        set({
-          user,
-          character: { ...initialCharacter, name },
-        });
-      },
+      addTracker: (categoryId, name, icon) => set(s => ({
+        trackers: [...s.trackers, { id: generateId(), categoryId, name, icon, createdAt: today(), isActive: true }]
+      })),
 
-      addTask: (taskData) => {
-        const xpReward = getXPForTask(taskData.priority);
-        const task: Task = {
-          ...taskData,
-          id: generateId(),
-          completed: false,
-          xpReward,
-          createdAt: new Date().toISOString(),
-        };
-        set((state) => ({ tasks: [...state.tasks, task] }));
-      },
+      removeTracker: (trackerId) => set(s => ({
+        trackers: s.trackers.filter(t => t.id !== trackerId)
+      })),
 
-      toggleTask: (taskId) => {
-        const { tasks, character } = get();
-        const task = tasks.find((t) => t.id === taskId);
-        if (!task) return;
+      toggleLog: (trackerId, date) => set(s => {
+        const existing = s.logs.find(l => l.trackerId === trackerId && l.date === date);
+        let newLogs: TrackerLog[];
+        let xpDelta = 0;
 
-        const wasCompleted = task.completed;
-        const updatedTasks = tasks.map((t) =>
-          t.id === taskId
-            ? { ...t, completed: !t.completed, completedAt: !t.completed ? new Date().toISOString() : undefined }
-            : t
-        );
-        set({ tasks: updatedTasks });
-
-        if (!wasCompleted) {
-          get().addXP(task.xpReward);
-          get().updateDayProgress();
+        if (existing) {
+          newLogs = s.logs.map(l =>
+            l.trackerId === trackerId && l.date === date
+              ? { ...l, completed: !l.completed, completedAt: !l.completed ? new Date().toISOString() : undefined }
+              : l
+          );
+          xpDelta = existing.completed ? -XP_PER_TRACKER : XP_PER_TRACKER;
         } else {
-          const newTotalXP = Math.max(0, character.totalXpEarned - task.xpReward);
-          const newLevel = getLevelFromXP(newTotalXP);
-          const xpInCurrentLevel = newTotalXP - getTotalXPForLevel(newLevel);
-          const xpToNext = getXPForLevel(newLevel);
-          set({
-            character: {
-              ...character,
-              xp: xpInCurrentLevel,
-              level: newLevel,
-              xpToNextLevel: xpToNext,
-              totalXpEarned: newTotalXP,
-            },
-          });
-          get().updateDayProgress();
+          newLogs = [...s.logs, { trackerId, date, completed: true, completedAt: new Date().toISOString() }];
+          xpDelta = XP_PER_TRACKER;
         }
-      },
 
-      deleteTask: (taskId) => {
-        set((state) => ({ tasks: state.tasks.filter((t) => t.id !== taskId) }));
-      },
+        return { logs: newLogs, totalXP: Math.max(0, s.totalXP + xpDelta) };
+      }),
 
-      getTodayTasks: () => {
-        const today = getTodayString();
-        return get().tasks.filter((t) => t.date === today);
-      },
+      addAskesis: (name) => set(s => ({
+        askesisItems: [...s.askesisItems, {
+          id: generateId(), name, startDate: today(), currentStreak: 0,
+          longestStreak: 0, lastCheckedDate: null, isActive: true
+        }]
+      })),
 
-      addNote: (title, content) => {
-        const colors = ["#FFF8F0", "#F0F8FF", "#F0FFF4", "#FFF0F8", "#FFFBF0"];
-        const note: Note = {
-          id: generateId(),
-          title,
-          content,
-          color: colors[Math.floor(Math.random() * colors.length)],
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-        set((state) => ({ notes: [note, ...state.notes] }));
-      },
+      removeAskesis: (id) => set(s => ({
+        askesisItems: s.askesisItems.filter(a => a.id !== id)
+      })),
 
-      updateNote: (id, title, content) => {
-        set((state) => ({
-          notes: state.notes.map((n) =>
-            n.id === id ? { ...n, title, content, updatedAt: new Date().toISOString() } : n
-          ),
-        }));
-      },
-
-      deleteNote: (id) => {
-        set((state) => ({ notes: state.notes.filter((n) => n.id !== id) }));
-      },
-
-      addXP: (amount) => {
-        const { character } = get();
-        const newTotalXP = character.totalXpEarned + amount;
-        const newLevel = getLevelFromXP(newTotalXP);
-        const xpInCurrentLevel = newTotalXP - getTotalXPForLevel(newLevel);
-        const xpToNext = getXPForLevel(newLevel);
-        set({
-          character: {
-            ...character,
-            xp: xpInCurrentLevel,
-            level: newLevel,
-            xpToNextLevel: xpToNext,
-            totalXpEarned: newTotalXP,
-            state: "happy",
-          },
-        });
-        setTimeout(() => {
-          const currentChar = get().character;
-          if (currentChar.state === "happy") {
-            get().updateCharacterState();
-          }
-        }, 2000);
-      },
-
-      updateCharacterState: () => {
-        const todayTasks = get().getTodayTasks();
-        const completedToday = todayTasks.filter((t) => t.completed).length;
-        const night = isNightTime();
-
-        let state: Character["state"] = "idle";
-        if (night) state = "sleep";
-        else if (completedToday > 0 && completedToday === todayTasks.length && todayTasks.length > 0) state = "happy";
-        else if (completedToday > 0) state = "work";
-
-        set((s) => ({ character: { ...s.character, state } }));
-      },
-
-      updateDayProgress: () => {
-        const today = getTodayString();
-        const todayTasks = get().getTodayTasks();
-        const completed = todayTasks.filter((t) => t.completed).length;
-        const xpEarned = todayTasks.filter((t) => t.completed).reduce((sum, t) => sum + t.xpReward, 0);
-        const dayComplete = todayTasks.length > 0 && completed === todayTasks.length;
-
-        set((state) => {
-          const existing = state.dayHistory.find((d) => d.date === today);
-          const newProgress: DayProgress = {
-            date: today,
-            tasksTotal: todayTasks.length,
-            tasksCompleted: completed,
-            xpEarned,
-            completed: dayComplete,
+      checkAskesis: (id, date) => set(s => ({
+        askesisItems: s.askesisItems.map(a => {
+          if (a.id !== id) return a;
+          const newStreak = a.currentStreak + 1;
+          return {
+            ...a,
+            lastCheckedDate: date,
+            currentStreak: newStreak,
+            longestStreak: Math.max(a.longestStreak, newStreak),
           };
-          const dayHistory = existing
-            ? state.dayHistory.map((d) => (d.date === today ? newProgress : d))
-            : [...state.dayHistory, newProgress];
-          return { dayHistory };
-        });
-        get().calculateStreak();
-      },
+        }),
+        totalXP: s.totalXP + XP_ASKESIS_BONUS,
+      })),
 
-      calculateStreak: () => {
-        const { dayHistory, user } = get();
-        if (!user) return;
-        const completedDays = dayHistory
-          .filter((d) => d.completed)
-          .map((d) => d.date)
-          .sort()
-          .reverse();
+      checkAskesisResets: () => {
+        const todayStr = today();
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = yesterday.toISOString().split('T')[0];
 
-        if (completedDays.length === 0) {
-          set({ currentStreak: 0 });
-          return;
-        }
-
-        let streak = 0;
-        const today = getTodayString();
-        const todayIndex = completedDays.indexOf(today);
-        if (todayIndex === -1 && differenceInCalendarDays(new Date(), parseISO(completedDays[0])) > 1) {
-          set({ currentStreak: 0 });
-          return;
-        }
-
-        for (let i = 0; i < completedDays.length; i++) {
-          if (i === 0) { streak = 1; continue; }
-          const diff = differenceInCalendarDays(parseISO(completedDays[i - 1]), parseISO(completedDays[i]));
-          if (diff === 1) streak++;
-          else break;
-        }
-
-        const challengeStart = parseISO(user.challengeStartDate);
-        const challengeDay = differenceInCalendarDays(new Date(), challengeStart) + 1;
-        const totalDaysCompleted = completedDays.length;
-
-        set((state) => ({
-          currentStreak: streak,
-          longestStreak: Math.max(state.longestStreak, streak),
-          totalDaysCompleted,
-          challengeDay: Math.min(Math.max(1, challengeDay), 90),
+        set(s => ({
+          askesisItems: s.askesisItems.map(a => {
+            if (!a.isActive) return a;
+            // If last checked was not today or yesterday, reset streak
+            if (a.lastCheckedDate && a.lastCheckedDate !== todayStr && a.lastCheckedDate !== yesterdayStr) {
+              return { ...a, currentStreak: 0, startDate: todayStr };
+            }
+            return a;
+          })
         }));
       },
 
-      toggleDarkMode: () => set((state) => ({ darkMode: !state.darkMode })),
+      addNote: (content) => set(s => ({
+        notes: [{ id: generateId(), content, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }, ...s.notes]
+      })),
+
+      updateNote: (id, content) => set(s => ({
+        notes: s.notes.map(n => n.id === id ? { ...n, content, updatedAt: new Date().toISOString() } : n)
+      })),
+
+      deleteNote: (id) => set(s => ({ notes: s.notes.filter(n => n.id !== id) })),
+
+      setWeather: (data) => set({ weather: data, weatherLastFetched: new Date().toISOString() }),
 
       resetApp: () => set(initialState),
     }),
-    {
-      name: "90days-app-storage",
-      storage: createJSONStorage(() => {
-        if (typeof window !== "undefined") return localStorage;
-        return {
-          getItem: () => null,
-          setItem: () => {},
-          removeItem: () => {},
-        };
-      }),
-    }
+    { name: '90-days-storage-v2' }
   )
 );

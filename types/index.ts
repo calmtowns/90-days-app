@@ -1,78 +1,92 @@
-export type TaskCategory = 'health' | 'work' | 'learning' | 'mindfulness' | 'fitness' | 'social' | 'creative' | 'other';
+export type CategoryId = 'health' | 'sport' | 'work' | 'development' | 'askesis';
 
-export type TaskPriority = 'low' | 'medium' | 'high';
-
-export interface Task {
+export interface Tracker {
   id: string;
-  title: string;
-  category: TaskCategory;
-  priority: TaskPriority;
-  completed: boolean;
-  xpReward: number;
-  createdAt: string;
-  completedAt?: string;
-  date: string; // YYYY-MM-DD
-  notes?: string;
-}
-
-export type CharacterState = 'idle' | 'work' | 'sleep' | 'happy' | 'workout';
-
-export type CharacterLevel = 'beginner' | 'discipline' | 'momentum' | 'transformation';
-
-export interface Character {
+  categoryId: CategoryId;
   name: string;
-  level: number;
-  xp: number;
-  xpToNextLevel: number;
-  state: CharacterState;
-  totalXpEarned: number;
+  icon?: string;
+  createdAt: string;
+  isActive: boolean;
 }
 
-export interface DayProgress {
-  date: string;
-  tasksTotal: number;
-  tasksCompleted: number;
-  xpEarned: number;
+export interface TrackerLog {
+  trackerId: string;
+  date: string; // YYYY-MM-DD
   completed: boolean;
+  completedAt?: string;
+}
+
+export interface AskesisItem {
+  id: string;
+  name: string;
+  startDate: string; // YYYY-MM-DD
+  currentStreak: number;
+  longestStreak: number;
+  lastCheckedDate: string | null; // last date it was marked done
+  isActive: boolean;
 }
 
 export interface Note {
   id: string;
-  title: string;
   content: string;
   createdAt: string;
   updatedAt: string;
-  color: string;
+  color?: string;
 }
 
-export type GoalArea = 'health' | 'career' | 'relationships' | 'learning' | 'finance' | 'creativity' | 'mindfulness' | 'fitness';
+export interface DayRecord {
+  date: string;
+  completedTrackers: string[];
+  totalTrackers: number;
+  xpEarned: number;
+}
 
 export interface UserProfile {
-  id: string;
   name: string;
-  goalAreas: GoalArea[];
-  challengeStartDate: string;
-  createdAt: string;
   onboardingCompleted: boolean;
-}
-
-export interface AppState {
-  user: UserProfile | null;
-  character: Character;
-  tasks: Task[];
-  notes: Note[];
-  dayHistory: DayProgress[];
-  currentStreak: number;
-  longestStreak: number;
-  totalDaysCompleted: number;
-  challengeDay: number;
-  darkMode: boolean;
+  challengeStartDate: string;
 }
 
 export interface LevelInfo {
   level: number;
-  name: string;
-  tier: CharacterLevel;
-  xpRequired: number;
-  xpTotal: number;
+  xp: number;
+  xpToNext: number;
+  xpInCurrentLevel: number;
+  totalXP: number;
+}
+
+export interface WeatherData {
+  temp: number;
+  condition: 'clear' | 'cloudy' | 'rain' | 'snow' | 'fog' | 'storm' | 'unknown';
+  description: string;
+  isDay: boolean;
+  feelsLike?: number;
+}
+
+export interface AppState {
+  user: UserProfile;
+  trackers: Tracker[];
+  logs: TrackerLog[];
+  askesisItems: AskesisItem[];
+  notes: Note[];
+  dayRecords: DayRecord[];
+  totalXP: number;
+  darkMode: boolean;
+  weather: WeatherData | null;
+  weatherLastFetched: string | null;
+
+  // Actions
+  completeOnboarding: (name: string) => void;
+  addTracker: (categoryId: CategoryId, name: string, icon?: string) => void;
+  removeTracker: (trackerId: string) => void;
+  toggleLog: (trackerId: string, date: string) => void;
+  addAskesis: (name: string) => void;
+  removeAskesis: (id: string) => void;
+  checkAskesis: (id: string, date: string) => void;
+  checkAskesisResets: () => void;
+  addNote: (content: string) => void;
+  updateNote: (id: string, content: string) => void;
+  deleteNote: (id: string) => void;
+  setWeather: (data: WeatherData) => void;
+  resetApp: () => void;
 }
